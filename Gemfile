@@ -1,12 +1,26 @@
 source 'https://rubygems.org'
 
 gem 'rails', '3.2.13'
+gem "jquery-rails"
 
 # Bundle edge Rails instead:
 # gem 'rails', :git => 'git://github.com/rails/rails.git'
 
-gem 'sqlite3'
+gem 'pg'  # If this line causes problems, you may need to do this: "sudo apt-get install libpq-dev"
 
+gem 'sqlite3'
+gem 'simple_form'
+
+gem "devise", "~> 2.2.4"
+
+gem 'pry', :group => :development
+gem 'execjs'
+gem 'therubyracer'
+
+# gem "best_in_place"
+gem 'best_in_place', github: 'bernat/best_in_place'
+
+gem "rubypython"
 
 # Gems used only for assets and not required
 # in production environments by default.
