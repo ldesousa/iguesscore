@@ -1,4 +1,4 @@
-Iguess::Application.routes.draw do
+Iguesscore::Application.routes.draw do
 
   resources :mod_configs
 
