@@ -1,4 +1,32 @@
-Iguesscore::Application.routes.draw do
+Iguess::Application.routes.draw do
+
+  resources :mod_configs
+
+  resources :cities
+
+  resources :wps_servers
+
+  resources :datasets
+
+  resources :dataserver_urls
+  
+  resources :config_datasets
+
+  devise_for :users, :controllers => {:registrations => "registrations"}
+
+  match 'about', :to => 'about#index'
+
+  # map.with_options :controller => 'about' do |about|
+  #   about.about 'about', :action => 'about'
+  #   # about.contact 'contact', :action => 'contact'
+  # end
+  
+  get "home/index"
+  get "home/geoproxy"
+  
+  # Use root as a shorthand to name a route for the root path “/”.
+  root :to => "home#index"
+
   # The priority is based upon order of creation:
   # first created -> highest priority.
 
@@ -55,4 +83,7 @@ Iguesscore::Application.routes.draw do
   # This is a legacy wild controller route that's not recommended for RESTful applications.
   # Note: This route will make all actions in every controller accessible via GET requests.
   # match ':controller(/:action(/:id))(.:format)'
+  
+  match ':controller(/:action(/:id(.:format)))'
+  
 end
