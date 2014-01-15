@@ -1,14 +1,152 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Iguesscore</title>
-  <%= stylesheet_link_tag    "application", :media => "all" %>
-  <%= javascript_include_tag "application" %>
-  <%= csrf_meta_tags %>
-</head>
-<body>
+  <% @site = Site.find_by_base_url(request.host) %>
+  <% @details = SiteDetail.find_by_id(@site.site_details_id) %>
 
-<%= yield %>
+  <title><%= @site.title %></title>
+  <%= stylesheet_link_tag    :application %>
+  <%= javascript_include_tag :application %>
+  <%= csrf_meta_tags %>
+
+<script type="text/javascript">
+  /* Script to enable JQuery UI / Themeroller buttons */
+  /* http://www.filamentgroup.com/lab/styling_buttons_and_toolbars_with_the_jquery_ui_css_framework/ */
+  $(document).ready(function(){
+      //hover states on the static widgets
+      $(".button_to").hover(
+          function() { $(this).addClass('ui-state-hover'); },
+          function() { $(this).removeClass('ui-state-hover'); }
+      );
+  });
+
+  var isUserLoggedIn = function() { return <%= user_signed_in? ? 'true' : 'false' %>; }
+
+</script>
+
+<%# Include Google Map code -- needs to be loaded on every page to suppress errors in MapInit.js %>
+<script src="http://maps.google.com/maps/api/js?v=3&amp;sensor=false"></script>
+
+
+</head>
+
+
+<body class="<% if params[:popup].nil? %>basic<% else %>popup<% end %>">
+
+<% if params[:popup].nil? %>
+
+  <div id="top_banner">
+    <div style="float:left; margin-top:1.3em; margin-left: .7em;">
+      <%= link_to image_tag("tudor_logo.png", :border => 0, :size => "99x35", :alt => "Henri Tudor Institute"), "http://www.tudor.lu/" %>
+    </div>
+
+    <div style="float:right; margin-top:.6em; margin-right: .7em;">
+      <%= link_to image_tag(@details.logo_img, :border => 1, :alt => @details.logo_alt_text), @details.logo_link_url %>&nbsp;
+      <%= link_to image_tag("interreg_logo.png", :border => 0, :alt => "INTERREG IVB"), 'http://www.nweurope.eu/' %>
+    </div>
+
+    <div style="text-align:center;">
+      <div style="font-size: 300%; margin-bottom:-.35em"><%= @site.title %></div>
+      <div style="padding-bottom: .5em"><%= @details.subtitle %></div>
+    </div>
+
+    <div id="navbar" style="z-index:10;">
+      <ul id="nav">
+        <li id="nav-1" title="<u><b>Return to starting screen</b></u>">
+            <a href="/">Home</a></li>
+        <% if user_signed_in? %>
+          <li id="nav-2" title="<u><b>Manage data</b></u><br>Upload new data, and view existing datasets">
+              <%= link_to "Data Manager", datasets_path %></li>
+        <% end %>
+        <li id="nav-3" title="<u><b>Configure & run modules</b></u><br>Create new datasets by running calculations">
+            <%= link_to "Modules", mod_configs_path %></li>
+        <li id="nav-4" title="<u><b>Define and run scenarios</b></u><br>Scenarios are complex models of potential future situations">
+            <%= link_to "Scenarios", scenarios_path %></li>
+        <!--<li id="nav-5" title="<u><b>Decision support tools</b></u><br>Compare scenario results, and access related tools">
+            <%= link_to "Decision Support", dss_path %></li>-->
+        <li id="nav-6" title="<u><b>View maps</b></u><br>Visualize data and model results">
+            <%= link_to "Maps", maps_path %></li>
+            
+        <% if user_signed_in? %>            
+          <li id="nav-7" title="<u><b>Compare maps</b></u><br>Compare maps side by side">
+              <%= link_to "Compare", compares_path %></li>
+        <% end %>
+
+        <li id="nav-8" title="<u><b>About</b></u><br>About this site and contact details">
+            <%= link_to "About", about_path %></li>
+
+
+        <div>
+          <!-- For now, show city dropdown on maps and compares to all users, not on other pages unless user is a super user -->
+          <!-- In future, we'll do this more elegantly by placing map chooser in map window itself -->
+          <% if (user_signed_in? and current_user.role_id == 2 ) or params[:controller] == "maps" or params[:controller] == "compares" %>
+            <select name="cities" id="city-dropdown">
+              <% for city in City.find_all_by_site_details_id(@details.id) %>
+                <option value="<%= city.name %>" <% if city.name == cookies['city'] %>selected<% end %>><%= city.name %></option>
+              <% end %>
+            </select>
+          <% end %>
+
+
+          <script type="text/javascript">
+
+            function setCityCookie(city) {
+              $.cookie("city", city, { expires: 99999, path :"/" });
+            }
+
+            function getCityCookie() {
+              return $.cookie("city", { path: "/foo"});
+            }
+
+            // If the city cookie doesn't exist when we load this page, create it
+            // Note that the city-dropdown element will not be there for all users, so we need to check if the element is defined
+            $(document).ready(function() {
+              if(getCityCookie() == null && document.getElementById("city-dropdown")) {
+                setCityCookie(document.getElementById("city-dropdown").value);
+              }
+            });
+
+            $('#city-dropdown').change(function() {
+              setCityCookie(this.value);
+              if(typeof onLocationChanged != "undefined") 
+                onLocationChanged(this.value);        // Implement this function on a page if you want to be alerted to a location change
+              else
+                location.reload();
+            });
+          </script>
+
+
+          <div id="login">
+            <% if user_signed_in? %> 
+              Signed in as <%= current_user.first_name %> (<%= City.find_by_id(current_user.city_id).name %>)&nbsp;&nbsp;&nbsp;
+              [<%= link_to 'Account', edit_user_registration_path %> |
+              <%= link_to "Logout", destroy_user_session_path, :method => :delete %>]
+            <% else %>  
+              [<%= link_to "New User", new_user_registration_path %> |
+              <%= link_to "Login", new_user_session_path %>]
+            <% end %>  
+          </div>
+        </div>
+      </ul>
+
+
+    </div>
+  </div>
+
+
+<% end %>
+
+<div id="main_body">
+  <%= yield %>
+</div>
+
+<script>
+  $('#navbar li[title]').tooltip({ position: 'bottom center', offset: [0,55], predelay: 500 });   // Activate our tooltips
+</script>
+
+<% if params[:popup].nil? %>
+  <br><br><br>
+<% end %>
 
 </body>
 </html>

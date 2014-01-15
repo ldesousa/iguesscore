@@ -1,0 +1,11 @@
+<div id="above-area-of-interest-spacer"></div>
+<label class="simple_form label" id="area-of-interest-label">Area of Interest</label>
+
+<% aois = getAoiDatasets(@current_city) %>      <%# There will always be at least one %>
+<% if aois.size == 1 then %>
+    There are no datasets tagged with "Area of Interest"
+<% else %>
+    <!-- This item will get an id of "mod_config_aoi" -->
+    <%= collection_select(:mod_config, :aoi, aois, :id, :title, {}, {:class=>"disableable", :onchange=>"onSelectedDatasetChanged()"} ) %>
+<% end %>
+

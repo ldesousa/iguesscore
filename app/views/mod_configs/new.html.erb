@@ -1,0 +1,132 @@
+
+<h1 class="page_header">Configure a Module</h1>
+
+<div class="explanation">
+  You are configuring a new module.  Provide a unique name, a description, and specify any datasets you can.
+  You will have a chance to provide any missing data for this module in subsequent steps.
+</div>
+
+
+<%= simple_form_for @mod_config, :validate => true do |f| %>
+  <%= f.error_notification %>
+
+  <%= f.input :name, :as => :string, :placeholder => 'Configuration name' %>
+
+  <div class="input text">
+    <label class="simple_form label">Module Type</label>
+    <span>
+      <select class="process-dropdown-control" id="processControl">
+        <%= options_for_select(@wps_processes.map { |p| [p.title, p.id] }, { :selected => params[:template] }) %>
+      </select>
+    </span>
+  </div>
+  <div class="input text"><label class="simple_form label"></label><span id="proc-descr">&nbsp;</span></div>
+
+
+  <%= f.input :descr, :as => :text, :label => "Description", :input_html => { :rows => 6, :cols => 80, :maxlength => 5000 },
+              :placeholder => "Description of configuration" %>
+
+  <div id="input-output-form">   <%# NOTE -- We don't have a configuration here when we are creating a new module! %>
+    <%= render :partial => "show_area_of_interest_control" %>
+
+    <label class="simple_form label table-label">Inputs</label>
+    <table class="zebra" id="input-table"> <!-- Will be populated via script --></table>
+    <label class="simple_form label table-label">Outputs</label>
+    <table class='zebra' id="output-table"><!-- Will be populated via script --></table>
+
+    <%= render :partial => "show_associated_parameters_table",
+               :locals  => { :mode => :input,  :config => @mod_config } %>
+
+    <%= render :partial => "show_associated_parameters_table",
+               :locals  => { :mode => :output, :config => @mod_config } %>
+  </div>
+
+  <div id="bottom-links">
+    <%# Add a cancel link that gets back to the different places we could have come from %>
+    <% came_from = params[:came_from] || "" %>
+
+    <% if came_from == "catalog" %>
+      <%= link_to "Cancel", mod_configs_path(:anchor => :module_catalog_tab) %>
+    <% else %>
+      <%= link_to "Cancel", mod_configs_path %>
+    <% end %> 
+
+    <input type="hidden" name="wps_process_id" id="wps_process_id">
+
+    <%= f.submit "Create New Configuration" %>
+  </div>
+
+<% end %>
+
+
+
+<script>
+
+  // User has selected a different process from the drop down box... need to rebuild inputs/outputs sections
+  var onProcessChanged = function()
+  {
+    // These functions are defined in _show_assocated_parameters_table.erb
+    populateTable(Procs[$('#processControl').val()].inputs,  true);
+    populateTable(Procs[$('#processControl').val()].outputs, false);
+
+    var identifier   = Procs[$('#processControl').val()].identifier;
+
+    $("#wps_process_id").val(Procs[$('#processControl').val()].id);
+
+    // Set the description field
+    $("#proc-descr").html(Procs[$('#processControl').val()].descr || '&nbsp');
+  };
+
+
+
+  var serverProcessingComplete  = false;  // True when we have all the dataset info we expect
+
+
+  // This will be a javascript struct that holds info about the various processes we can run, indexed by the database id
+  var Procs = { };
+
+  <% @wps_processes.each do |p| %> 
+    Procs[<%= p.id %>] = {
+      identifier: "<%= escape_javascript(p.identifier) %>",
+      id:         <%= p.id %>,
+      title:      "<%= escape_javascript(p.title || p.identifier) %>",
+      descr:      "<%= escape_javascript(p.abstract) %>",
+      serverUrl:  "<%= escape_javascript(p.wps_server.url) %>",
+      inputs:     [
+        <% ProcessParam.find_all_by_wps_process_id_and_is_input_and_alive(p.id, true, true, :order=>:title).each { |x| %>
+          <%= raw x.to_json + ',' %><% } 
+        %>],
+      outputs:    [
+        <% ProcessParam.find_all_by_wps_process_id_and_is_input_and_alive(p.id, false, true, :order=>:title).each { |x| %>
+          <%= raw x.to_json + ',' %><% } 
+        %>]
+    };
+  <% end %>
+
+
+  // Called when we've gotten whatever response we're going to get from a wfs server -- here type will always be 'WFS'
+  // This will be called once for every server we probe
+
+  // User has updated an input or output entry slot (called via onChange event)
+  // In this case, we have nothing to do
+  var onInputOutputTextEntryChanged = function() { }
+
+  // Here a dataset dropdown has changed.  Again we have nothing to do.
+  var onSelectedDatasetChanged = function() { }
+
+
+  // Gets run after a form field gets updated
+  function readyToRunModule() {  }
+
+
+
+  $(document).ready(function () {
+    $("#processControl").change(function() {
+      onProcessChanged();
+    });
+
+    onProcessChanged();   // Build initial form configuration
+  });
+  
+</script>
+

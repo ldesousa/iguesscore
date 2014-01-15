@@ -1,0 +1,319 @@
+<div>
+  <h1 class="page_header">Registered Datasets</h1>
+
+
+
+  <div class="filter-box"><form id="filter-form" style="display: inline">Filter: <input name="filter" id="filter" value="" maxlength="30" size="30" type="text"></form>
+
+  <%= button_to "Register New Datasets", 
+              { :controller => "datasets", :action => "mass_import", :id => 1 }, 
+              :class => "register-datasets-button-top" %>
+
+  </div>
+
+  <table id="sortable_table" class="zebra sortable">
+    <thead>
+      <tr>
+        <th title="Dataset name">Name</th>
+        <th title="Tags attached to dataset">Tags</th>
+        <th title="Is dataset visible to non-logged in users?">Published?</th>
+        <th class="center" title="Is dataset currently available?">Status</th>
+        <th class="center" title="Server hosting the dataset">Server</th>
+      </tr>
+    </thead>
+    <tbody id="dataset-list">
+      <% @datasets.each do |d| %>
+        <tr id="dsid-<%= d.id %>">
+          <% hasError = ! d.alive %>
+          <td <% if hasError %>class="dataset-error"<% end %>>
+            <%= d.title.present? ? d.title : d.identifier %>
+            <img src="/assets/small_gear.png" class="info-icon" 
+                  alt="More info" title="Click for details" rel="#infotable-<%= d.id %>">
+          </td>
+          <td>
+            <span class="taglist-<%= cssEscape(d.dataserver.url + d.identifier) %>">
+              <% getAliveTags(d).each do |t| %>
+                <span class="tag"><%= t %></span>
+              <% end %>
+            </span>
+          </td>
+          <td>
+            <label>
+              <span>
+                <!-- Create a hidden span to allow sorting by checkbox status -->
+                <span class="sortcol hidden" id="cb-<%= d.id %>"><%= d.published ? "1" : "2" %></span>  
+                <input class="publish-checkbox" data-datasetid="<%= d.id %>" id="x-<%= d.id %>"
+                       type="checkbox" <%= d.published ? raw('checked="yes"') : "" %> >Publish
+              </span>
+            </label>
+          </td>
+          <td nowrap>
+            <span class="hidden"><%= d.alive ? "1" : "2" %></span>      <!-- Hidden span allows sorting by availability -->
+              <%= d.alive ? raw('<div style="cursor:pointer; display:inline;" rel="#infotable-layer-unavailable">' +
+                                  '<img class="status-indicator" src="/assets/layer_available_yes.png" alt="Layer available">' +
+                                '</div>') :
+                            raw('<div style="cursor:pointer; display:inline;" rel="#infotable-layer-unavailable">' +
+                                  '<img class="status-indicator" src="/assets/layer_available_no.png"  alt="Layer not available">' +
+                                '</div>') 
+              %>
+          </td>
+          <td nowrap>
+            <%= d.dataserver.title %>
+          </td>
+        </tr>
+      <% end%>
+    </tbody>
+  </table>
+
+  <div id="infotables">
+    <!-- Create the popups that are displayed when the user clicks (?) -->
+    <% @datasets.each do |d| %>
+      <div class="infotable" id="infotable-<%= d.id %>">
+        <div class="close"></div>
+        <h1><span class="dataset-title"><%= d.title.present? ? d.title : d.identifier %></span></h1>
+        <div class = "dataset-abstract"><%= d.abstract %></div> 
+        <div style="overflow:hidden">
+          <dl>
+            <dt>Server Name:</dt><dd class="server-name"><%= d.dataserver.title %></dd>
+            <dt>Data Services:</dt>
+            <dd id="results-<%= d.id %>">
+              <%= insertGetCapabilitiesLinkBlock(d.dataserver.url, d.dataserver.wms, d.service == "WFS", d.service == "WCS") %>
+            </dd>
+
+              <% if not d.alive %>
+                <dt class="error-header">Error State:</dt>
+                <dd class="error-body">
+                  This layer is no longer available -- the data owner may have renamed or removed it.  Sorry!
+                  <br><br>
+                  <%= link_to "Unregister Dataset", d, confirm: "Are you sure you want to unregister this dataset?", 
+                           method: :delete, :remote => true, :class => "dataset-deleted" %>
+                </dd>
+              <% end %>
+
+            <dt>Tags:</dt>
+            <dd>
+              <span class="taglist-deletable-<%= cssEscape(d.dataserver.url + d.identifier) %>">
+                <% getAliveTags(d).each do |t| %>
+                  <span class="tag">
+                    <span class="tag-delete-button" data-url="<%= d.dataserver.url %>" data-identifier="<%= d.identifier %>"></span>
+                    <%= t %>
+                  </span>
+                <% end %>
+              </span>
+              
+              <select style="float:right" class="add-tag-dropdown-control" 
+                data-serverurl="<%= d.dataserver.url %>"
+                data-datasetidentifier="<%= d.identifier %>" 
+                onchange="tagPickerChanged($(this));"> 
+
+                <option value = "Ignore This">Add Tag:</option>
+
+                <% getAllTags(d).each do |t| %>
+                  <option value="<%= t %>"><%= t %></option>
+                <% end %>
+                
+              </select>
+            </dd>
+            <dt>Configurations:</td>
+            <dd>
+              <% if d.mod_configs.size > 0 %>
+                <% d.mod_configs.each do |m| %><%= m.name %> <% end %>
+              <% else %>
+                Not used in any configurations
+              <% end %>
+            </dd>
+            <dt>Actions:</dt>
+            <dd>
+              <% if d.mod_configs.size == 0 then 
+                    msg = "Are you sure you want to unregister this dataset?"
+                 else
+                    t = d.mod_configs.size == 1 ? "that" : "those"
+                    c = d.mod_configs.size == 1 ? "configuration" : "configurations"
+
+                    msg = "This dataset is in use by " + d.mod_configs.size.to_s + " " + c + ".\n" +
+                          "Unregistering it will cause it to be removed from " + t + " " + c + ".\n" + 
+                          "Click OK if you are sure you want to unregister this dataset." 
+                 end %>
+
+              <%= link_to "Unregister Dataset", d, confirm: raw(msg), 
+                           method: :delete, :remote => true, :class => "dataset-deleted" %>
+            </dd>
+          </dl>
+        </div>
+        <div style="overflow:hidden" class="technical-details">
+          <div class="technical-details-header">Technical Details</div>
+          <dl>
+            <dt>Server Base URL:</dt><dd><%= d.server_url %></dd>
+            <dt>Dataset Identifier:</dt><dd><%= d.identifier %></dd>
+            <dt>All Get Capabilities Links:</dt><dd>
+              <%= insertGetCapabilitiesLinkBlock(d.dataserver.url, :true, :true, :true) %>
+            </dd>
+            <dt>Projections Available:</dt><dd></dd> 
+            <dt>Bounding Box:</dt><dd></dd>
+            <dt>Attribute Columns:</dt><dd></dd>
+          </dl>
+        </div>
+        <div>
+          <!-- return false; prevents underlying page from scrolling when -->
+          <a href="#" class="show-details" onclick="return false;">Technical details >>></a>
+        </div>    
+      </div>
+    <% end %>
+  </div>
+
+
+  <%= button_to "Register New Datasets", 
+            { :controller => "datasets", :action => "mass_import", :id => 1 }, 
+            :class => "register-datasets-button-bottom" %>
+
+  &nbsp;&nbsp;
+
+  <!-- <a href="#" onclick="return launchHarvester();">Run Metadata Harvester</a> -->
+
+  <br />
+</div>
+
+<div class="infotable" id="infotable-layer-unavailable">
+  <h1><span class="dataset-title">Layer Avaialilty</span></h1>
+  <div>
+    Data layers are generally hosted on remote servers.  From time to time, the remote server might be unavailable, the owners might change 
+    the name of a data layer, or they could remove it altogether.  We periodically check these servers to see if data is still available.  
+    If it is not, we report the layer as being unavaialable.  It may be that the data will return in the future, or it may be permanently
+    gone.  Since we have no connection with the owners of these remote servers, we have no way to know why data has become unavailable. 
+  </div>
+</div>
+
+
+
+<script type="text/javascript">
+ $(document).ready(function() {
+    $('#sortable_table').tablesorter();               // Initialize sorter
+
+
+    // Handle unregistering a dataset
+    $(".dataset-deleted").bind("ajax:success",
+             function(evt, data, status, xhr) {
+                  // Data contains the dataset_id
+                  $('#dsid-' + data).remove();                              // Remove the table row from main window
+                  $('#infotable-' + data).find(".close").trigger('click');  // Simulate click on the close button to get fade effect
+     }).bind("ajax:error", function(evt, data, status, xhr) {
+              //do something with the error here
+              alert("Could not unregister dataset.");
+     });
+
+    $('div[rel]').overlay();  // Activate availability status overlays
+
+  });
+</script>
+
+
+<%= render :partial => 'tag_functions.html.erb' %> 
+
+<script type="text/javascript">
+
+  // $('a.popup[rel]').overlay();                         // Activate popups for managing dataset tags 
+  $('img[rel]').overlay();                             // Set up the layer info overlays
+  $('img[rel]').click(function(){ hideDetails(); });   // Close details panel on open
+
+  $('.publish-checkbox').click(function() { publishDataset(this); });
+
+
+  var showDetails = function() {
+    $('.technical-details').show(); 
+
+    var el = $('.show-details');
+
+    el.unbind("click");
+    el.click(function(){ hideDetails(); });
+    el.html('<<< Hide details');
+  };
+
+
+  var hideDetails = function() {
+    $('.technical-details').hide();
+
+    var el = $('.show-details');
+
+    el.unbind("click");
+    el.click(function(){ showDetails(); });
+    el.html('Technical details >>>');
+  };
+
+
+  var publishDataset = function(ctrl) {
+    var datasetId = ctrl.getAttribute('data-datasetid');
+    var checked   = ctrl.checked;
+
+    // Set sort column contents to checkboxes will sort properly
+    var el = $("#cb-" + datasetId);
+    el.html(checked ? "1" : "2");
+
+    el.parents("table").trigger("update"); 
+
+
+    // Notify the server
+    $.ajax({
+      type:    'PUT',      // PUT combined with url below triggers "update" action on controller
+      url:     '<%= url_for(:controller => 'datasets', :action => 'publish') %>',
+      data:    'dataset[id]=' + datasetId +
+               '&checked='    + checked,
+      headers: { 'X-CSRF-Token': '<%= form_authenticity_token.to_s %>' /*,
+                 'Content-Type': 'application/json' */},
+      success: function(data) {  }
+    });
+  };
+
+
+  var launchHarvester = function()
+  {
+    // Notify the server
+    $.ajax({
+      type:    'PUT',      // PUT combined with url below triggers "update" action on controller
+      url:     "<%= url_for(:controller => 'datasets', :action => 'run_harvester') %>",
+      headers: { 'X-CSRF-Token': '<%= form_authenticity_token.to_s %>' /*,
+                 'Content-Type': 'application/json' */},
+      success: function(data) { alert("Harvester launched!"); }
+    });
+
+    return false;
+  }
+
+
+  addDeleteTagClickHander();    // Get ready to delete tags!
+
+  // Make sure table is sorted
+  var sorting = [[1,0], [0,0]]; 
+  // sort on the first column 
+
+  $('#sortable_table').trigger("update"); 
+  $('#sortable_table').trigger("sorton",[sorting]); 
+
+
+  $(document).bind('ajax:success', function(xhr, data, status) { 
+    $('#dataset-id-' + data).hide();
+  });
+
+
+  $(function() {
+    var theTable = $('#sortable_table')
+
+    theTable.find("tbody > tr").find("td:eq(1)").mousedown(function(){
+      $(this).prev().find(":checkbox").click()
+    });
+
+    $("#filter").keyup(function() {
+      $.uiTableFilter( theTable, this.value );
+    })
+
+    $('#filter-form').submit(function(){
+      theTable.find("tbody > tr:visible > td:eq(1)").mousedown();
+      return false;
+    }).focus(); //Give focus to input field
+  });
+</script>
+
+
+
+
+
+

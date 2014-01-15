@@ -1,0 +1,381 @@
+
+
+<p id="notice"><%= notice %></p>
+
+<h1 class="page_header">
+  Module Configuration
+</h1>
+
+
+<div class="explanation" id="explanation">
+  This is the primary module control panel.  You can modify or run the module.
+</div>
+
+<div class="module-status-box">
+  MODULE STATUS: <span id="status-display"><img src="/assets/loading_spinner.gif" width=16 height=11> Checking...</span>
+  <br>
+  <span id="clear-error-container" style="display:none;">
+    <div class="center">
+      <%= button_to "Clear Error Status", { :action => "clearerror", :controller => "mod_configs", :id => @mod_config.id }, 
+                                            :remote => true,  
+                                            form: { :id => "clear-error-form", "data-type" => "json" }  %>
+    </div>
+</span>
+
+</div>
+
+<div class="simple_form">
+  <label>Name</label>
+  <%= best_in_place @mod_config, :name, :type => :input, :activator => "#click_to_edit_name" %>
+  <span class="click_to_edit" id="click_to_edit_name">[Click to edit]</span>
+</div>
+
+
+<div class="simple_form">
+  <label>Based on</label>
+  <span id="based-on"><%= @mod_config.wps_process.title %></span>
+</div>
+
+
+<div class="simple_form">
+  <label>Details</label>
+  <span id="mod-descr"><%= @mod_config.wps_process.abstract %></span>
+</div>
+
+
+<div class="simple_form">
+  <label>Note</label>
+  <%= best_in_place @mod_config, :descr, :type => :textarea, :activator => "#click_to_edit_notes" %>
+  <span class="click_to_edit" id="click_to_edit_notes">[Click to edit]</span>
+</div>
+
+
+
+<div class="simple_form">
+  <%= form_for @mod_config, :url => {:action => "update"}, :html=> {:id=>"input-output-form", "data-type" => "json"}, :remote=>true do |f| %>
+
+    <%= render :partial => "show_area_of_interest_control" %>
+
+    <label class="simple_form label table-label">Inputs</label>
+    <table class="zebra" id="input-table"> <!-- Will be populated via script --></table>
+    <label class="simple_form label table-label">Outputs</label>
+    <table class="zebra" id="output-table"><!-- Will be populated via script --></table>
+
+    <%= render :partial => "show_associated_parameters_table",
+               :locals  => { :mode => :input,  :config => @mod_config } %>
+
+    <%= render :partial => "show_associated_parameters_table",
+               :locals  => { :mode => :output, :config => @mod_config } %>
+
+    <input name="mod_config[status]" type="hidden" value="NEEDS_DATA" id="hidden_status_tag" />
+
+  <% end %>
+</div>
+
+<br>
+
+<!-- Show special buttons depending on status  -->
+<div class="simple_form">
+
+  <label class="simple_form label">&nbsp;</label>
+  <%# method => get causes button to act like a normal link, rather than a form post %>
+  <%= link_to "View Module List", mod_configs_path, :class => "linkbutton" %>
+
+  <span id="run_module_button_container" style="display:none">
+
+    <%= button_to "Run Module >>>", { :action => "run", :controller => "mod_configs", :id => @mod_config.id }, 
+                                   :remote => true, :class => "linkbutton", :id => "run-module-button", 
+                                   form: { :id => "run-module-form", "data-type" => "json" }  %>
+  </span>
+
+
+  <span id="stop_module_button_container" style="display:none">
+    <%= button_to "Stop Running >>>", { :action => "stop_running", :controller => "mod_configs", :id => @mod_config.id }, 
+                               :remote => true, :class => "linkbutton", :id => "stop-module-button", 
+                               :confirm =>"Are you sure you want to stop running the module??",
+                               form: { :id => 'stop-module-form', "data-type" => "json" }  %>
+  </span>
+
+</div>
+
+
+<!-- Special links off ot the lower right -->
+<div id="status" style="float: right; margin-top: -30px;">
+
+  <%= link_to 'Delete This Module', @mod_config,
+     confirm: "Deleting this module is a permanent action.\n\n" + 
+              "Click OK if you are sure you want to delete this module.", method: :delete %>
+</div>
+
+<br><br>
+
+
+
+<script>
+
+  // // We only care about WFS here, as these are all that can be used with process configurations
+  // // Uses functions in build_data_layers partial
+  // getWmsLayers(registeredDataServers);
+
+  function hideButtons() {
+    $('#run_module_button_container').hide();
+    $('#stop_module_button_container').hide();
+    hideClearButton();
+  }
+
+  function enableEditing() {
+    $('.disableable').prop('disabled',false);
+    $('.hideable').show();
+  }
+
+  function disableEditing() {
+    $('.disableable').prop('disabled',true);
+    $('.hideable').hide();
+  }
+
+  function showRunButton(text) {
+    $('#run-module-button').attr('value', text);
+    $('#run_module_button_container').show();
+  }
+
+  function showClearButton() {
+    $('#clear-error-container').show();
+  }
+
+  function hideClearButton() {
+    $('#clear-error-container').hide();
+  }
+
+
+// Fix a jQuery bug by overwriting this function... kind of lame...   This fixes an negative interaction
+// between jQuery and Best In Place that probably started after upgrading jQuery past 1.9.  This issue
+// is known to jQuery folks, who assert it is not in fact a bug.  Please see http://bugs.jquery.com/ticket/13430
+// for more details.  The issue here is Best In Place is sending undefined to parseJSON, which is... bad.
+// This will only get run for jQuery major version 1, looks like this bug has been fixed in jQuery 2.x
+if($().jquery.split(".")[0] == "1") {
+  jQuery.extend({
+    parseJSON: function( data ) {
+      // Attempt to parse using the native JSON parser first
+      if ( data && window.JSON && window.JSON.parse ) {
+        return window.JSON.parse( data );
+      }
+      if ( data === null || data === undefined ) {
+        return null;
+      }
+      if ( typeof data === "string" ) {
+        // Make sure leading/trailing whitespace is removed (IE can't handle it)
+          data = jQuery.trim( data );
+          if ( data ) {
+            // Make sure the incoming data is actual JSON
+            // Logic borrowed from http://json.org/json2.js
+            if ( rvalidchars.test( data.replace( rvalidescape, "@" )
+            .replace( rvalidtokens, "]" )
+            .replace( rvalidbraces, "")) ) {
+              return ( new Function( "return " + data ) )();
+            }
+          }
+      }
+      jQuery.error( "Invalid JSON: " + data ); 
+    }
+  });
+}
+
+
+  // My... this is UGLY!
+  var inputs  = [<% @input_params.each  { |x|%><%= raw x.to_json %>,<% } %>];
+  var outputs = [<% @output_params.each { |x|%><%= raw x.to_json %>,<% } %>];
+
+
+  // Dictionary of values for each input on this form
+  var formValues = { <%= raw @formValues %> };
+
+  // Dictionary of selected datasets used for selecting items in selected dataset dropdowns
+  var datasetValues = { <%= raw @datasetValues %> };
+
+
+  var checkDataStatus = function() {
+    stat = "READY";
+
+    if(anyDatasetsMissing) {
+      stat = "NEEDS_DATA";
+    }
+
+    // Check to ensure that each select box has a value (except AOI, which we don't care about)
+    $("#input-output-form").find(":input").each( function() {
+      if($(this).is("select") && $(this).attr("id") != "mod_config_aoi" && $(this).val() == -1) {
+        stat = "NEEDS_DATA";   // Found a missing dataset, so update the status to NEEDS_DATA and quit
+      }
+    });
+
+    // Check to ensure that each text input has a value
+    $("#input-output-form").find(":input").each( function() {
+      if($(this).is("input") && $(this).is(":visible") && $(this).val() === "") {
+        stat = "NEEDS_DATA";   // Found a missing dataset, so update the status to NEEDS_DATA and quit
+      }
+    });
+
+    return stat;
+  }
+
+
+// TODO: Build this from the database
+ var getPrettyStatusName = function(statusCode) 
+ {
+    if(statusCode == 'NEEDS_DATA') { return 'Needs Data';    }
+    if(statusCode == 'READY')      { return 'Ready';         }
+    if(statusCode == 'RUNNING')    { return 'Running';       }
+    if(statusCode == 'FINISHED')   { return 'Run Completed'; }
+    if(statusCode == 'ERROR')      { return 'Error';         }
+
+    return ('Unknown Status');
+  }
+
+
+  var isRunning = false;
+
+  var updateScreen = function(statusCode, message) 
+  {
+    hideButtons();
+
+    isRunning = false;
+
+    $('#status-display').text(getPrettyStatusName(statusCode));
+    var explanationclass = "explanation";
+
+    if(statusCode == 'NEEDS_DATA') {    // Module just created, needs data
+      $('#explanation').html("Before you can run this module, you need to supply data or values for each of the inputs. " +
+                             "You can do this by selecting a dataset from the list provided for each parameter, or by creating new datasets.");
+      enableEditing();
+
+    } else if(statusCode == 'READY') {    // Module ready to go... maybe
+      // The thing is, we still don't really know if we're ready, as the server has no knowledge of exactly what params we need.
+      // The server _thinks_ we've got everything, but only we know for sure.  So let's make sure all inputs are in fact specified.
+
+      $('#explanation').html("This module has all its data and is ready to run.  Click the Run button to start the process.");
+      enableEditing();
+      showRunButton('Run Module >>>');
+
+    } else if(statusCode == 'RUNNING') {    // Module is running
+      $('#stop_module_button_container').show();
+      $('#explanation').html("This module is currently running.  You can refresh this page, " +
+                             "or check back later to monitor the module's progress, " +
+                             "but you cannot change dataset information while the module is running.");
+
+        if(message !== '') {
+          $('#status-display').append('<br>' + message);
+        }
+      
+        disableEditing();
+        isRunning = true;
+        
+        explanationclass = "explanation-running";
+
+    } else if(statusCode == 'FINISHED') {   // Module run compete
+      $('#explanation').html("This module has been successfully run.  You can now view the outputs in the Data Manager.");
+      enableEditing();
+
+      showRunButton('Run Module Again >>>');
+      
+      explanationclass = "explanation-success";
+
+
+    } else if(statusCode == 'ERROR') {    // Module run ended in error
+      $('#explanation').html("We experienced an error running this configuration.  The WPS server replied:<br>" +
+                             "<code>" + message + "</code>");
+      enableEditing();
+      showRunButton('Try Running Module Again >>>');
+
+      showClearButton();
+
+      explanationclass = "explanation-problem";
+      
+    }
+
+    $("#explanation").removeClass("explanation explanation-problem explanation-running explanation-success");
+    $("#explanation").addClass(explanationclass);
+    $("body").css("cursor", "auto");
+  }
+
+
+  // User has updated an input or output entry slot (called via onChange event)
+  var onInputOutputTextEntryChanged = function() 
+  {
+    var status = checkDataStatus();
+    $('#hidden_status_tag').val(status);
+    $('#input-output-form').submit();
+  };
+
+  // Gets triggered when a selected dataset changes
+  var onSelectedDatasetChanged = function() {
+    var status = checkDataStatus();
+    $('#hidden_status_tag').val(status);
+    $('#input-output-form').submit();
+
+    // If this is a WCS, we have more data to ship
+  };
+
+
+  var poll = function()
+  {
+    setTimeout(reloadData, 10000);
+  }
+
+
+  var reloadData = function()
+  {
+    if(isRunning)
+      $.getJSON("<%= url_for(:action => 'getupdate', :format=>:json) %>", function(data){
+        updateScreen(data.status, data.status_text);
+      });
+
+    poll();
+  }
+
+
+  $(document).ready(function() {
+
+    populateTable(inputs,  true,  formValues, datasetValues);
+    populateTable(outputs, false, formValues);
+
+    updateScreen("<%= @mod_config.status %>", "<%= escape_javascript @mod_config.status_text %>"); 
+
+
+    // Bind some event handlers
+    $("#run-module-form")
+      .bind("ajax:beforeSend", function(xhr, data, status) { 
+        showRunButton("Working...");
+    }).bind("ajax:success", function(xhr, data, status) { 
+        updateScreen(data.status, data.status_text); 
+    });
+
+    $("#stop-module-form")
+      .bind("ajax:success", function(xhr, data, status) { 
+        updateScreen(data.status, data.status_text); 
+    });
+
+    $("#clear-error-form")
+      .bind("ajax:success", function(xhr, data, status) { 
+        updateScreen(data.status, data.status_text); 
+    });
+
+
+    // An input/output text field has been updated; data contains a ModConfig object
+    $("#input-output-form")
+      .bind("ajax:success", function(xhr, data, status) {
+        updateScreen(data.status, data.status_text); 
+    }).bind("ajax:error", function(evnt, jqXHR, ajaxSettings, thrownError) { 
+        alert("iGUESS: There was an error.  Please see the console log for information.");
+        console.log("error: ", arguments); 
+    });
+
+    // Response handler for best_in_class fields (Name and Note)
+    $(".best_in_place").best_in_place()
+      .bind("ajax:success", function(xhr, data, status) { 
+        updateScreen(JSON.parse(data).status, JSON.parse(data).status_text); 
+    });
+
+    poll();
+
+ });
+
+</script>
